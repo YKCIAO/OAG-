@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environments
+.env
+.venv
+venv/
+env/
+
+# Conda
+*.conda
+*.condarc
+
+# Data
+*.npy
+*.npz
+*.mat
+BN278_FC/
+data/
+
+# Models / outputs
+*.pth
+outputs/
+results/
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
