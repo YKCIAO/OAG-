@@ -83,7 +83,7 @@ class OrthogonalAutoEncoder(nn.Module):
         )
 
         # Age regressor from z_age
-        self.regressor = AttentionRegressor(in_dim=self.z_age_dim)
+        self.regressor = AttentionRegressor(in_dim=self.z_age_dim, tau=1.4)
 
         # Age group classifier
         self.classifier = nn.Sequential(
@@ -112,7 +112,7 @@ class OrthogonalAutoEncoder(nn.Module):
         x = self.fc4(x)
         x = x.view(x.size(0), self.cfg.conv2_out, 29, 29)
         y = self.decoder(x)
-        # ✅ 直接断言，抓 bug
+        # ✅ assert bugs
         assert y.dim() == 4, f"decoder output must be 4D, got {y.shape}"
         assert y.size(0) == z_age.size(0), f"batch mismatch: {y.size(0)} vs {z_age.size(0)}"
         assert y.size(1) == 1, f"channel must be 1, got {y.shape}"

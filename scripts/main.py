@@ -10,35 +10,80 @@ from src.training.train_pipeline import TrainConfig, train_and_eval
 from src.training.utils import reset_seeds
 
 
-def dataset_ctor(train_x, train_y, val_x, val_y):
+def dataset_ctor(train_x, train_y, val_x, val_y, test_x, test_y):
     train_ds = FCDataset(train_x, train_y, train=True, argument=True)
     val_ds   = FCDataset(val_x, val_y, train=False, argument=False)
-    return train_ds, val_ds
+    test_ds  = FCDataset(test_x, test_y, train=False, argument=False)
+    return train_ds, val_ds, test_ds
 
 
-def build_folds_from_group_paths(
+from typing import Sequence, Tuple, List
+import numpy as np
+
+
+def build_nested_folds_from_group_paths(
     group_paths: Sequence[Tuple[str, str]],
-) -> List[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+    val_ratio: float = 0.1,
+    seed: int = 42,
+) -> List[Tuple[np.ndarray, np.ndarray,
+                np.ndarray, np.ndarray,
+                np.ndarray, np.ndarray]]:
     """
-    Convert 5 group files into 5-fold CV splits.
-    Each fold uses one group as validation, the other groups as training.
-    Returns: list of (train_x, train_y, val_x, val_y)
+    Build nested cross-validation splits from group-based folds.
+
+    Outer loop:
+        - One group is held out as TEST.
+    Inner loop:
+        - From the remaining groups (training pool),
+          a subset is split off as VALIDATION.
+
+    Returns a list of tuples:
+        (train_x, train_y,
+         val_x,   val_y,
+         test_x,  test_y)
     """
+
+    # ---------- load all groups ----------
     xs, ys = [], []
     for fc_path, label_path in group_paths:
-        x = np.load(fc_path)
-        y = np.load(label_path)
-        xs.append(x)
-        ys.append(y)
+        xs.append(np.load(fc_path))
+        ys.append(np.load(label_path))
+
+    k = len(xs)
+    rng = np.random.RandomState(seed)
 
     folds = []
-    k = len(xs)
-    for i in range(k):
-        val_x, val_y = xs[i], ys[i]
-        train_x = np.concatenate([xs[j] for j in range(k) if j != i], axis=0)
-        train_y = np.concatenate([ys[j] for j in range(k) if j != i], axis=0)
-        folds.append((train_x, train_y, val_x, val_y))
+
+    for test_idx in range(k):
+        # ---------- outer test ----------
+        test_x, test_y = xs[test_idx], ys[test_idx]
+
+        # ---------- training pool (other folds) ----------
+        pool_x = np.concatenate([xs[j] for j in range(k) if j != test_idx], axis=0)
+        pool_y = np.concatenate([ys[j] for j in range(k) if j != test_idx], axis=0)
+
+        # ---------- nested train / val split ----------
+        n = len(pool_y)
+        idx = np.arange(n)
+        rng.shuffle(idx)
+
+        n_val = max(1, int(round(n * val_ratio)))
+        n_val = min(n_val, n - 1)  # ensure train not empty
+
+        val_idx = idx[:n_val]
+        train_idx = idx[n_val:]
+
+        train_x, train_y = pool_x[train_idx], pool_y[train_idx]
+        val_x, val_y     = pool_x[val_idx],   pool_y[val_idx]
+
+        folds.append(
+            (train_x, train_y,
+             val_x,   val_y,
+             test_x,  test_y)
+        )
+
     return folds
+
 
 
 def build_argparser():
@@ -56,9 +101,9 @@ def build_argparser():
 
     # loss weights (keep your current defaults)
     p.add_argument("--w_recon", type=float, default=0.1)
-    p.add_argument("--w_age", type=float, default=0.36)
-    p.add_argument("--w_ortho", type=float, default=0.23)
-    p.add_argument("--w_class", type=float, default=0.74)
+    p.add_argument("--w_age", type=float, default=0.4)
+    p.add_argument("--w_ortho", type=float, default=0.2)
+    p.add_argument("--w_class", type=float, default=0.75)
 
     return p
 
@@ -93,7 +138,7 @@ def main():
         for i in range(1, 6)
     ]
 
-    folds = build_folds_from_group_paths(group_paths)
+    folds = build_nested_folds_from_group_paths(group_paths)
 
     mean_mae = train_and_eval(
         folds=folds,

@@ -103,8 +103,12 @@ def orthogonal_guided_loss(
 
     # --- classification loss (standard) ---
     # class_true expected as integer class index tensor shape (B,)
-    class_true = class_true.long().view(-1)
-    class_loss = F.cross_entropy(class_pred_logits, class_true)
+    #class_true = class_true.long().view(-1)
+    #class_loss = F.cross_entropy(class_pred_logits, class_true)
+    # --- classification loss (KL) ---
+    class_prob = F.log_softmax(class_pred_logits, dim=1)
+    class_true = F.one_hot(class_true, num_classes=7).float()
+    class_loss = F.kl_div(class_prob,class_true, reduction="batchmean")
 
     # --- orthogonality ---
     ortho = orthogonal_loss(z_age, z_noise)
@@ -127,6 +131,7 @@ def orthogonal_guided_loss(
     )
 
     logs = {
+        "total": round(float(total.item()), 4),
         "recon": round(float(recon_loss.item()), 4),
         "auxilregss": round(float(age_loss.item()), 4),
         "auxilclass": round(float(class_loss.item()), 4),

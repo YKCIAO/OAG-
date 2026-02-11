@@ -5,12 +5,50 @@ from typing import Dict, Tuple
 
 import torch
 import torch.nn.functional as F
-
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
 
 @dataclass
 class Stage2Result:
-    best_state_dict: Dict[str, torch.Tensor]
+    best_state_dict: dict
     best_val_mae: float
+    test_mae: float = float("nan")
+    test_rows: Optional[List[Dict[str, Any]]] = None
+    best_epoch: int = -1
+
+
+def predict_stage2_simple(encoder, regressor, loader, device) -> List[Dict[str, float]]:
+    encoder.eval()
+    regressor.eval()
+
+    rows: List[Dict[str, float]] = []
+    with torch.no_grad():
+        for batch in loader:
+            # 兼容你的 batch 格式
+            if len(batch) == 3:
+                x, age_true, _ = batch
+            elif len(batch) == 5:
+                x, _, age_true, _, _ = batch
+            else:
+                x = batch[0]
+                age_true = batch[1]
+
+            x = x.to(device)
+            age_true = age_true.to(device)
+
+            z_age, _ = encoder.encode(x)
+            pred = regressor(z_age).view(-1)
+
+            pred = pred.detach().cpu()
+            y = age_true.view(-1).detach().cpu()
+
+            for i in range(len(y)):
+                rows.append({
+                    "age_true": float(y[i].item()),
+                    "age_pred": float(pred[i].item()),
+                })
+
+    return rows
 
 
 @torch.no_grad()
@@ -45,13 +83,30 @@ def _eval_stage2(encoder, regressor, loader, device) -> float:
     return mae
 
 
-def train_stage2(encoder, regressor, train_loader, val_loader, optimizer, device, cfg) -> Stage2Result:
+def train_stage2(
+    encoder,
+    regressor,
+    train_loader,
+    val_loader,
+    test_loader,
+    optimizer,
+    scheduler,
+    device,
+    cfg
+) -> Stage2Result:
     best_mae = float("inf")
     best_sd = None
+    best_epoch = -1
+
     patience = 0
 
+    report_every = getattr(cfg, "report_every_stage2", 20)  # 每30 epoch 打印
+    early_stop_patience = getattr(cfg, "early_stop_patience", 10)
+    min_delta = getattr(cfg, "min_delta_stage2", 0.0)       # 可选：最小改进幅度
+    warmup_epochs = getattr(cfg, "val_warmup_stage2", 500)    # 可选：前几轮不计patience
+
     for epoch in range(cfg.epochs_stage2):
-        encoder.eval()  # 通常 stage2 冻结 encoder；如果你要 finetune，可以改成 train()
+        encoder.eval()  # stage2 默认冻结 encoder；如需 finetune 改 encoder.train()
         regressor.train()
 
         for batch in train_loader:
@@ -68,33 +123,70 @@ def train_stage2(encoder, regressor, train_loader, val_loader, optimizer, device
 
             with torch.no_grad():
                 z_age, z_noise = encoder.encode(x)
-
-            pred = regressor(z_age)
-            loss = F.huber_loss(pred, age_true.float())
+                noise = torch.randn_like(z_age) * 0.02
+                z_age = z_age + noise
+                age_smooth = age_true + torch.randn_like(age_true) * 0.4
+            pred = regressor(z_age)  # (B,) or (B,1)
+            pred = pred.view(-1)
+            loss = F.l1_loss(pred, age_smooth.float().view(-1))
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(regressor.parameters(), cfg.grad_clip)
             optimizer.step()
+            scheduler.step()
 
+        # --- val metric for early stopping ---
         val_mae = _eval_stage2(encoder, regressor, val_loader, device)
 
-        if val_mae < best_mae:
+        improved = (best_mae - val_mae) > min_delta
+        if improved:
             best_mae = val_mae
+            best_epoch = epoch
             patience = 0
             best_sd = {k: v.detach().cpu().clone() for k, v in regressor.state_dict().items()}
         else:
-            patience += 1
+            if epoch >= warmup_epochs:
+                patience += 1
 
-        if cfg.verbose:
-            print(f"[Stage2] epoch {epoch+1}/{cfg.epochs_stage2} val_mae={val_mae:.4f} best={best_mae:.4f}")
+        # --- report every 30 epochs ---
+        if cfg.verbose and ((epoch + 1) % report_every == 0):
+            print(
+                f"[Stage2] epoch {epoch+1}/{cfg.epochs_stage2} "
+                f"val_mae={val_mae:.4f} best={best_mae:.4f} "
+                f"patience={patience}/{early_stop_patience}"
+            )
 
-        if patience >= cfg.early_stop_patience:
+        # --- early stop ---
+        if epoch >= warmup_epochs and patience >= early_stop_patience:
             if cfg.verbose:
-                print(f"[Stage2] Early stop at epoch {epoch+1}")
+                print(
+                    f"[Stage2] Early stop at epoch {epoch+1}. "
+                    f"Best epoch={best_epoch+1} best_val_mae={best_mae:.4f}"
+                )
             break
 
     if best_sd is None:
         best_sd = {k: v.detach().cpu().clone() for k, v in regressor.state_dict().items()}
 
-    return Stage2Result(best_state_dict=best_sd, best_val_mae=float(best_mae))
+    # --- restore best regressor before final test ---
+    regressor.load_state_dict(best_sd)
+    regressor.to(device)
+
+    # --- final test (ONLY ONCE) ---
+    test_mae = _eval_stage2(encoder, regressor, test_loader, device)
+    test_rows = predict_stage2_simple(encoder, regressor, test_loader, device)
+
+    if cfg.verbose:
+        print(f"[Stage2][TEST] mae={test_mae:.4f} n={len(test_rows)}")
+
+    # 你可能需要扩展 Stage2Result 来带上 test 结果；推荐这么做：
+    return Stage2Result(
+        best_state_dict=best_sd,
+        best_val_mae=float(best_mae),
+        # ↓↓↓ 若 Stage2Result 支持这些字段就保留；不支持就删掉并在外部接收 test_rows
+        test_mae=float(test_mae),
+        test_rows=test_rows,
+        best_epoch=int(best_epoch),
+    )
+

@@ -7,7 +7,7 @@ import torch
 from sklearn.decomposition import PCA
 
 from src.models.OAG_CAE import OrthogonalAutoEncoder
-from src.models.regressors import ConvAgeRegressor
+from src.models.regressors import ConvAgeRegressor, ConvAgeRegressorConfig
 from src.explain.model_adapters import PCA2AgeWrapper
 from src.explain.pca_shap import KernelShapConfig, run_kernelshap_on_pca, backproject_shap_to_fc
 from src.explain.io import save_npy, save_expected_value, save_shap_pca_table_xlsx, save_beeswarm
@@ -15,19 +15,22 @@ from src.explain.io import save_npy, save_expected_value, save_shap_pca_table_xl
 
 def build_parser():
     p = argparse.ArgumentParser()
-    p.add_argument("--fc_all", type=str, required=True, help="all_folds_fc_combined.npy (N,1,278,278)")
-    p.add_argument("--fold_sizes", type=int, nargs="+", required=True, help="e.g. 117 120 120 119 123")
-    p.add_argument("--out_root", type=str, required=True)
+    p.add_argument("--fc_all", type=str, help="all_folds_fc_combined.npy (N,1,278,278)",
+                   default='../BN278_FC/all_folds_fc_combined.npy')
+    p.add_argument("--fold_sizes", type=int, nargs="+", help="e.g. 117 120 120 119 123",default=[117, 120, 120, 119, 123])
+    p.add_argument("--out_root", type=str, default='../BN278_FC')
 
     p.add_argument("--pca_components", type=int, default=10)
     p.add_argument("--background", type=int, default=20)
-    p.add_argument("--nsamples", type=int, default=200)
+    p.add_argument("--nsamples", type=int, default=100)
     p.add_argument("--device", type=str, default="cpu")
 
-    p.add_argument("--encoder_template", type=str, required=True,
-                   help="format string, e.g. /path/fold{fold}/best_encoder.pth")
-    p.add_argument("--regressor_template", type=str, required=True,
-                   help="format string, e.g. /path/fold{fold}/best_regressor.pth")
+    p.add_argument("--encoder_template", type=str,
+                   help="format string, e.g. /path/fold{fold}/best_encoder.pth",
+                   default='../result/fold{fold}/fold{fold}_oag_cae_bestvalid.pth')
+    p.add_argument("--regressor_template", type=str,
+                   help="format string, e.g. /path/fold{fold}/best_regressor.pth",
+                   default='../result/fold{fold}/fold{fold}_regressor_bestvalid.pth')
     return p
 
 
@@ -65,8 +68,9 @@ def main():
         encoder = OrthogonalAutoEncoder(input_dim=278, z_age_dim=32, z_noise_dim=32)
         encoder.load_state_dict(torch.load(args.encoder_template.format(fold=fold), map_location="cpu"))
         encoder.eval()
-
-        regressor = ConvAgeRegressor(hidden_dim=4)
+        reg_cfg = ConvAgeRegressorConfig(in_dim=32, hidden_channels=1, length=32, tau=2.2,
+                                         gate_softmax_dim=2)
+        regressor = ConvAgeRegressor(reg_cfg)
         regressor.load_state_dict(torch.load(args.regressor_template.format(fold=fold), map_location="cpu"))
         regressor.eval()
 

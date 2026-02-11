@@ -11,6 +11,8 @@ import torch.nn.functional as F
 class Stage1Result:
     best_state_dict: Dict[str, torch.Tensor]
     best_val_loss: float
+    test_loss: float
+    best_epoch: int
     last_log: Dict[str, float]
 
 
@@ -65,12 +67,45 @@ def _eval_stage1(model, loader, loss_fn, device, cfg) -> Tuple[float, Dict[str, 
     return avg_loss, avg_log
 
 
-def train_stage1(model, train_loader, val_loader, optimizer, loss_fn, device, cfg) -> Stage1Result:
+from typing import Optional
+
+def train_stage1(
+    model,
+    train_loader,
+    val_loader,
+    test_loader,            # NEW
+    optimizer,
+    loss_fn,
+    device,
+    cfg
+) -> Stage1Result:
+    """
+    Stage 1 training with:
+      - train/val/test split
+      - early stopping on val
+      - reporting every report_every epochs (default 20)
+      - final test evaluation using the best checkpoint
+
+    Assumes _eval_stage1(model, loader, loss_fn, device, cfg) exists and returns (loss, log_dict).
+    """
+
     best_val = float("inf")
     best_sd = None
+    best_epoch = -1
     last_log = {}
 
+    # --- config defaults (safe) ---
+    report_every = getattr(cfg, "report_every", 20)      # print every 20 epochs
+    early_stop_patience = getattr(cfg, "early_stop", 10) # you can set cfg.early_stop
+    min_delta = getattr(cfg, "min_delta", 0.0)           # optional: require improvement by > min_delta
+    warmup_epochs = getattr(cfg, "val_warmup", 0)        # optional: don't early-stop before this epoch
+
+    patience = 0
+
     for epoch in range(cfg.epochs_stage1):
+        # --------------------
+        # Train
+        # --------------------
         model.train()
         running = 0.0
         n = 0
@@ -116,17 +151,72 @@ def train_stage1(model, train_loader, val_loader, optimizer, loss_fn, device, cf
             last_log = log
 
         train_loss = running / max(n, 1)
+
+        # --------------------
+        # Validate (every epoch for early stop accuracy; print every 20)
+        # --------------------
         val_loss, val_log = _eval_stage1(model, val_loader, loss_fn, device, cfg)
 
-        if val_loss < best_val:
+        # --------------------
+        # Early stopping on val
+        # --------------------
+        improved = (best_val - val_loss) > min_delta
+        if improved:
             best_val = val_loss
+            best_epoch = epoch
             best_sd = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            patience = 0
+        else:
+            # only count patience after warmup (optional)
+            if epoch >= warmup_epochs:
+                patience += 1
 
-        if cfg.verbose:
-            print(f"[Stage1] epoch {epoch+1}/{cfg.epochs_stage1} "
-                  f"train={train_loss:.4f} val={val_loss:.4f} log={val_log}")
+        # --------------------
+        # Reporting (every report_every epochs)
+        # --------------------
+        if cfg.verbose and ((epoch + 1) % report_every == 0):
+            print(
+                f"[Stage1] epoch {epoch+1}/{cfg.epochs_stage1} "
+                f"train={train_loss:.4f} val={val_loss:.4f} "
+                f"best_val={best_val:.4f} patience={patience}/{early_stop_patience} "
+                f"log={val_log}"
+            )
 
+        # --------------------
+        # Stop condition
+        # --------------------
+        if epoch >= warmup_epochs and patience >= early_stop_patience:
+            if cfg.verbose:
+                print(
+                    f"[Stage1] Early stopping at epoch {epoch+1}. "
+                    f"Best epoch={best_epoch+1} best_val={best_val:.4f}"
+                )
+            break
+
+    # --------------------
+    # Load best checkpoint before testing
+    # --------------------
     if best_sd is None:
         best_sd = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
-    return Stage1Result(best_state_dict=best_sd, best_val_loss=float(best_val), last_log=last_log)
+    model.load_state_dict(best_sd)  # restore best for final test
+    model.to(device)
+
+    # --------------------
+    # Final test evaluation (ONLY ONCE)
+    # --------------------
+    test_loss, test_log = _eval_stage1(model, test_loader, loss_fn, device, cfg)
+
+    if cfg.verbose:
+        print(f"[Stage1][TEST] loss={test_loss:.4f} log={test_log}")
+
+    # 如果你的 Stage1Result 结构体目前没有 test 字段：
+    # 你可以先只返回 best_sd/best_val/last_log；或者扩展 Stage1Result（推荐扩展）
+    return Stage1Result(
+        best_state_dict=best_sd,
+        best_val_loss=float(best_val),
+        test_loss=float(test_loss),
+        best_epoch=int(best_epoch),
+        last_log=last_log,
+    )
+
