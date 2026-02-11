@@ -25,6 +25,7 @@ data/
 outputs/
 results/
 logs/
+result/
 
 # OS
 .DS_Store
