@@ -149,7 +149,7 @@ def train_stage1(
 
         train_loss = running / max(n, 1)
 
-        if epoch < cfg.warmup:
+        if epoch < cfg.warmup-100:
             # warm-up phase: no validation
             pass
         elif (epoch + 1) % 20 == 0:
