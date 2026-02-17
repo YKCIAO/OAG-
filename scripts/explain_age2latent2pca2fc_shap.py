@@ -68,7 +68,7 @@ def main():
         encoder = OrthogonalAutoEncoder(input_dim=278, z_age_dim=32, z_noise_dim=32)
         encoder.load_state_dict(torch.load(args.encoder_template.format(fold=fold), map_location="cpu"))
         encoder.eval()
-        reg_cfg = ConvAgeRegressorConfig(in_dim=32, hidden_channels=1, length=32, tau=2.2,
+        reg_cfg = ConvAgeRegressorConfig(in_dim=32, hidden_channels=1, length=32, tau=2.5,
                                          gate_softmax_dim=2)
         regressor = ConvAgeRegressor(reg_cfg)
         regressor.load_state_dict(torch.load(args.regressor_template.format(fold=fold), map_location="cpu"))

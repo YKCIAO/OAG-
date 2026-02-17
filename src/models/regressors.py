@@ -89,7 +89,7 @@ class ConvAgeRegressorConfig:
     gate_softmax_dim: int = 2  # softmax over channel dim by default
     residual_scale: float = 0.0
     bias_shift_init: float = 1.0
-    tau: float = 2.2
+    tau: float = 2.5
 
 
 class ConvAgeRegressor(nn.Module):

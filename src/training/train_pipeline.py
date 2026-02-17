@@ -90,7 +90,7 @@ def _build_models(cfg: TrainConfig, device: torch.device):
     encoder = OrthogonalAutoEncoder(cfg.input_dim, cfg.z_age_dim, cfg.z_noise_dim).to(device)
 
     # Stage2 regressor（你可改成 AttentionRegressor 或你的配置）
-    reg_cfg = ConvAgeRegressorConfig(in_dim=cfg.z_age_dim, hidden_channels=1, length=cfg.z_age_dim, tau=2.2,
+    reg_cfg = ConvAgeRegressorConfig(in_dim=cfg.z_age_dim, hidden_channels=1, length=cfg.z_age_dim, tau=2.5,
                                      gate_softmax_dim=2)
     regressor = ConvAgeRegressor(reg_cfg).to(device)
     return encoder, regressor
