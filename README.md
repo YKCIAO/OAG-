@@ -48,10 +48,6 @@ OAG-CAE/
 │       PCA → KernelSHAP → FC-level explanation
 │
 ├── src/
-│   ├── data/
-│   │   └── datasetFC.py
-│   │       FC datasets, masking, augmentation, label handling
-│   │
 │   ├── models/
 │   │   ├── OAG_CAE.py
 │   │   │   Orthogonal Autoencoder (encoder + decoder + age heads)
@@ -73,7 +69,9 @@ OAG-CAE/
 │   │   ├── io_training.py
 │   │   │   Training log I/O
 │   │   └── utils.py
-│   │       Seeding, age grouping, utilities
+│   │   │   Seeding, age grouping, utilities
+│   │   └── datasetFC.py
+│   │       FC datasets, masking, augmentation, label handling
 │   │
 │   └── explain/
 │       ├── model_adapters.py

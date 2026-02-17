@@ -5,7 +5,7 @@ from typing import List, Sequence, Tuple
 
 import numpy as np
 
-from src.data.datasetFC import FCDataset
+from src.training.datasetFC import FCDataset
 from src.training.train_pipeline import TrainConfig, train_and_eval
 from src.training.utils import reset_seeds
 
@@ -92,7 +92,7 @@ def build_argparser():
     # basic
     p.add_argument("--seed", type=int, default=2574)
     p.add_argument("--device", type=str, default="cuda")
-    p.add_argument("--out_dir", type=str, default="D:/CodeHome/python/OAG-CAE/BN278_FC/FC_/")
+    p.add_argument("--out_dir", type=str, default="D:/CodeHome/python/OAG-CAE/result")
     p.add_argument("--input_dir", type=str, default="D:/CodeHome/python/OAG-CAE/BN278_FC/")
 
     # wandb

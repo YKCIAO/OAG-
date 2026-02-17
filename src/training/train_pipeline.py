@@ -23,16 +23,16 @@ from src.training.losses import orthogonal_guided_loss  # <- 如果你文件名�
 class TrainConfig:
     seed: int = 42
     device: str = "cuda"  # or "cpu"
-    num_workers: int = 0
+    num_workers: int = 8
     batch_num: int = 2
 
     # stage1
-    epochs_stage1: int = 2
+    epochs_stage1: int = 1000
     lr_stage1: float = 2e-4
     wd_stage1: float = 2e-3
 
     # stage2
-    epochs_stage2: int = 2
+    epochs_stage2: int = 2000
     lr_stage2: float = 2e-2
     wd_stage2: float = 2e-3
     early_stop_patience: int = 10

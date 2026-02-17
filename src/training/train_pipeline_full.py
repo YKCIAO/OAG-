@@ -13,7 +13,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 from scipy.stats import pearsonr, spearmanr
 
 # keep your original imports / names
-from src.data.datasetFC import fMRIDataset
+from src.training.datasetFC import fMRIDataset
 
 from src.models.OAG_CAE import OrthogonalAutoEncoder
 from src.training.losses import orthogonal_guided_loss
