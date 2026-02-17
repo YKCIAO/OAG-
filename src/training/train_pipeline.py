@@ -24,12 +24,14 @@ class TrainConfig:
     seed: int = 42
     device: str = "cuda"  # or "cpu"
     num_workers: int = 8
+    num_workers: int = 4
     batch_num: int = 2
 
     # stage1
     epochs_stage1: int = 1000
     lr_stage1: float = 2e-4
     wd_stage1: float = 2e-3
+    warmup: int = 400
 
     # stage2
     epochs_stage2: int = 2000
@@ -49,6 +51,7 @@ class TrainConfig:
 
     grad_clip: float = 5.0
     verbose: bool = True
+    min_delta: float = 0.0
 
     # model dims
     input_dim: int = 278
@@ -62,7 +65,9 @@ class TrainConfig:
 
 def _resolve_device(cfg: TrainConfig) -> torch.device:
     if cfg.device == "cuda" and torch.cuda.is_available():
+        print(f"\nCUDA is available, using {torch.cuda.device_count()}")
         return torch.device("cuda")
+    print(f"\nUsing cpu")
     return torch.device("cpu")
 
 

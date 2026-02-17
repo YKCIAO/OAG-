@@ -95,13 +95,9 @@ def train_stage1(
     last_log = {}
 
     # --- config defaults (safe) ---
-    report_every = getattr(cfg, "report_every", 20)      # print every 20 epochs
-    early_stop_patience = getattr(cfg, "early_stop", 10) # you can set cfg.early_stop
     min_delta = getattr(cfg, "min_delta", 0.0)           # optional: require improvement by > min_delta
-    warmup_epochs = getattr(cfg, "val_warmup", 0)        # optional: don't early-stop before this epoch
-
     patience = 0
-
+    early_stop = cfg.early_stop_patience
     for epoch in range(cfg.epochs_stage1):
         # --------------------
         # Train
@@ -152,46 +148,39 @@ def train_stage1(
 
         train_loss = running / max(n, 1)
 
-        # --------------------
-        # Validate (every epoch for early stop accuracy; print every 20)
-        # --------------------
-        val_loss, val_log = _eval_stage1(model, val_loader, loss_fn, device, cfg)
-
-        # --------------------
-        # Early stopping on val
-        # --------------------
-        improved = (best_val - val_loss) > min_delta
-        if improved:
-            best_val = val_loss
-            best_epoch = epoch
-            best_sd = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
-            patience = 0
-        else:
-            # only count patience after warmup (optional)
-            if epoch >= warmup_epochs:
-                patience += 1
-
-        # --------------------
-        # Reporting (every report_every epochs)
-        # --------------------
-        if cfg.verbose and ((epoch + 1) % report_every == 0):
-            print(
-                f"[Stage1] epoch {epoch+1}/{cfg.epochs_stage1} "
-                f"train={train_loss:.4f} val={val_loss:.4f} "
-                f"best_val={best_val:.4f} patience={patience}/{early_stop_patience} "
-                f"log={val_log}"
-            )
-
-        # --------------------
-        # Stop condition
-        # --------------------
-        if epoch >= warmup_epochs and patience >= early_stop_patience:
+        if epoch < cfg.warmup:
+            # warm-up phase: no validation
+            pass
+        elif (epoch + 1) % 20 == 0:
+            # --------------------
+            # Validate (every epoch for early stop accuracy; print every 20)
+            # --------------------
+            val_loss, val_log = _eval_stage1(model, val_loader, loss_fn, device, cfg)
+            # --------------------
+            # Reporting (every report_every epochs)
+            # --------------------
             if cfg.verbose:
                 print(
-                    f"[Stage1] Early stopping at epoch {epoch+1}. "
-                    f"Best epoch={best_epoch+1} best_val={best_val:.4f}"
+                    f"[Stage1] epoch {epoch + 1}/{cfg.epochs_stage1} "
+                    f"train={train_loss:.4f} val={val_loss:.4f} "
+                    f"best_val={best_val:.4f} patience={patience}/{early_stop} "
+                    f"log={val_log}"
                 )
-            break
+            # --------------------
+            # Early stopping on val
+            # --------------------
+            improved = (best_val - val_loss) > min_delta
+            if improved:
+                best_val = val_loss
+                best_epoch = epoch
+                best_sd = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+                patience = 0
+            else:
+                patience += 1
+                if patience >= early_stop:
+                    print(f"Early stopping at epoch {epoch + 1}. Best val loss={best_val:.6f}")
+                    break
+
 
     # --------------------
     # Load best checkpoint before testing

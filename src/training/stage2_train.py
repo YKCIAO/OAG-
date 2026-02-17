@@ -98,12 +98,9 @@ def train_stage2(
     best_sd = None
     best_epoch = -1
 
+    min_delta = getattr(cfg, "min_delta", 0.0)           # optional: require improvement by > min_delta
     patience = 0
-
-    report_every = getattr(cfg, "report_every_stage2", 20)  # 每30 epoch 打印
-    early_stop_patience = getattr(cfg, "early_stop_patience", 10)
-    min_delta = getattr(cfg, "min_delta_stage2", 0.0)       # 可选：最小改进幅度
-    warmup_epochs = getattr(cfg, "val_warmup_stage2", 500)    # 可选：前几轮不计patience
+    early_stop = cfg.early_stop_patience
 
     for epoch in range(cfg.epochs_stage2):
         encoder.eval()  # stage2 默认冻结 encoder；如需 finetune 改 encoder.train()
@@ -135,36 +132,35 @@ def train_stage2(
             torch.nn.utils.clip_grad_norm_(regressor.parameters(), cfg.grad_clip)
             optimizer.step()
             scheduler.step()
-
-        # --- val metric for early stopping ---
-        val_mae = _eval_stage2(encoder, regressor, val_loader, device)
-
-        improved = (best_mae - val_mae) > min_delta
-        if improved:
-            best_mae = val_mae
-            best_epoch = epoch
-            patience = 0
-            best_sd = {k: v.detach().cpu().clone() for k, v in regressor.state_dict().items()}
-        else:
-            if epoch >= warmup_epochs:
-                patience += 1
-
-        # --- report every 30 epochs ---
-        if cfg.verbose and ((epoch + 1) % report_every == 0):
-            print(
-                f"[Stage2] epoch {epoch+1}/{cfg.epochs_stage2} "
-                f"val_mae={val_mae:.4f} best={best_mae:.4f} "
-                f"patience={patience}/{early_stop_patience}"
-            )
-
-        # --- early stop ---
-        if epoch >= warmup_epochs and patience >= early_stop_patience:
+        if epoch < cfg.warmup:
+            # warm-up phase: no validation
+            pass
+        elif (epoch + 1) % 20 == 0:
+            # --------------------
+            # Validate (every epoch for early stop accuracy; print every 20)
+            # --------------------
+            # --- val metric for early stopping ---
+            val_mae = _eval_stage2(encoder, regressor, val_loader, device)
+            # --- report every 20 epochs ---
             if cfg.verbose:
                 print(
-                    f"[Stage2] Early stop at epoch {epoch+1}. "
-                    f"Best epoch={best_epoch+1} best_val_mae={best_mae:.4f}"
+                    f"[Stage2] epoch {epoch+1}/{cfg.epochs_stage2} "
+                    f"val_mae={val_mae:.4f} best={best_mae:.4f} "
+                    f"patience={patience}/{early_stop}"
                 )
-            break
+            improved = (best_mae - val_mae) > min_delta
+
+            if improved:
+                best_mae = val_mae
+                best_epoch = epoch
+                patience = 0
+                best_sd = {k: v.detach().cpu().clone() for k, v in regressor.state_dict().items()}
+            else:
+                patience += 1
+                if patience >= early_stop:
+                    print(f"Early stopping at epoch {epoch + 1}. Best val loss={best_mae:.6f}")
+                    break
+
 
     if best_sd is None:
         best_sd = {k: v.detach().cpu().clone() for k, v in regressor.state_dict().items()}
