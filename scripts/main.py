@@ -92,8 +92,6 @@ def build_argparser():
     # basic
     p.add_argument("--seed", type=int, default=2574)
     p.add_argument("--device", type=str, default="cuda")
-    p.add_argument("--out_dir", type=str, default="D:/CodeHome/python/OAG-CAE/result")
-    p.add_argument("--input_dir", type=str, default="D:/CodeHome/python/OAG-CAE/BN278_FC/")
     p.add_argument("--out_dir", type=str, default="/home/bio/PycharmProjects/OAG-/result/")
     p.add_argument("--input_dir", type=str, default="/nfsd/biopetmri4/Users/YikangCao/HCP_project/yk_autoencoder/crossvalid_dataset/")
 

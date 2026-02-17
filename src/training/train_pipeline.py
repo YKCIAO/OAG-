@@ -24,7 +24,6 @@ class TrainConfig:
     seed: int = 1000
     device: str = "cuda"  # or "cpu"
     num_workers: int = 8
-    num_workers: int = 4
     batch_num: int = 2
 
     # stage1
