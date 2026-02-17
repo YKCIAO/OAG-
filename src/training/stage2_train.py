@@ -14,6 +14,7 @@ class Stage2Result:
     best_val_mae: float
     test_mae: float = float("nan")
     test_rows: Optional[List[Dict[str, Any]]] = None
+    train_rows: Optional[List[Dict[str, Any]]] = None
     best_epoch: int = -1
 
 
@@ -172,7 +173,7 @@ def train_stage2(
     # --- final test (ONLY ONCE) ---
     test_mae = _eval_stage2(encoder, regressor, test_loader, device)
     test_rows = predict_stage2_simple(encoder, regressor, test_loader, device)
-
+    train_rows = predict_stage2_simple(encoder, regressor, train_loader, device)
     if cfg.verbose:
         print(f"[Stage2][TEST] mae={test_mae:.4f} n={len(test_rows)}")
 
@@ -183,6 +184,7 @@ def train_stage2(
         # ↓↓↓ 若 Stage2Result 支持这些字段就保留；不支持就删掉并在外部接收 test_rows
         test_mae=float(test_mae),
         test_rows=test_rows,
+        train_rows=train_rows,
         best_epoch=int(best_epoch),
     )
 

@@ -83,7 +83,7 @@ class OrthogonalAutoEncoder(nn.Module):
         )
 
         # Age regressor from z_age
-        self.regressor = AttentionRegressor(in_dim=self.z_age_dim, tau=1.4)
+        self.regressor = AttentionRegressor(in_dim=self.z_age_dim, tau=1.5)
 
         # Age group classifier
         self.classifier = nn.Sequential(

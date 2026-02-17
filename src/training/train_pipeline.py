@@ -21,7 +21,7 @@ from src.training.losses import orthogonal_guided_loss  # <- 如果你文件名�
 
 @dataclass
 class TrainConfig:
-    seed: int = 42
+    seed: int = 1000
     device: str = "cuda"  # or "cpu"
     num_workers: int = 8
     num_workers: int = 4
@@ -31,7 +31,7 @@ class TrainConfig:
     epochs_stage1: int = 1000
     lr_stage1: float = 2e-4
     wd_stage1: float = 2e-3
-    warmup: int = 400
+    warmup: int = 500
 
     # stage2
     epochs_stage2: int = 2000
@@ -162,13 +162,21 @@ def train_and_eval(
             device=device,
             cfg=cfg
         )
+        #
+        save_dir = f'../result/fold{i + 1}'
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = os.path.join(save_dir, "stage2_train_predictions.xlsx")
+
+        df = pd.DataFrame(s2.train_rows)
+        df.to_excel(save_path, index=False)
+
+        #
         fold_mae.append(s2.best_val_mae)
         df = pd.DataFrame(s2.test_rows)
-
-        save_dir = "../result"  # 相对路径（推荐）
-        os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, "stage2_test_predictions.xlsx")
         df.to_excel(save_path, index=False)
+        #
+
         # 输出 fold 结果
         save_json(f"{cfg.out_dir}/fold{i+1}_summary.json", {
             "fold": i + 1,
@@ -177,7 +185,6 @@ def train_and_eval(
             "stage1_test_loss": s1.test_loss,
             "stage2_test_mae": s2.test_mae
         })
-        os.makedirs(f'../result/fold{i + 1}', exist_ok=True)
         torch.save(s1.best_state_dict, f'../result/fold{i + 1}/fold{i + 1}_oag_cae_bestvalid.pth')
         torch.save(s2.best_state_dict, f'../result/fold{i + 1}/fold{i + 1}_regressor_bestvalid.pth')
     mean_mae = float(np.mean(fold_mae))

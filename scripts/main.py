@@ -24,7 +24,7 @@ import numpy as np
 def build_nested_folds_from_group_paths(
     group_paths: Sequence[Tuple[str, str]],
     val_ratio: float = 0.1,
-    seed: int = 42,
+    seed: int = 1000,
 ) -> List[Tuple[np.ndarray, np.ndarray,
                 np.ndarray, np.ndarray,
                 np.ndarray, np.ndarray]]:
@@ -102,10 +102,10 @@ def build_argparser():
     p.add_argument("--wandb_project", type=str, default="Autoencoder-predictage")
 
     # loss weights (keep your current defaults)
-    p.add_argument("--w_recon", type=float, default=0.1)
-    p.add_argument("--w_age", type=float, default=0.4)
+    p.add_argument("--w_recon", type=float, default=0.2)
+    p.add_argument("--w_age", type=float, default=0.5)
     p.add_argument("--w_ortho", type=float, default=0.2)
-    p.add_argument("--w_class", type=float, default=0.75)
+    p.add_argument("--w_class", type=float, default=0.3)
 
     return p
 

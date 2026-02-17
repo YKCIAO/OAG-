@@ -108,7 +108,7 @@ def orthogonal_guided_loss(
     # --- classification loss (KL) ---
     class_prob = F.log_softmax(class_pred_logits, dim=1)
     class_true = F.one_hot(class_true, num_classes=7).float()
-    class_loss = F.kl_div(class_prob,class_true, reduction="batchmean")
+    class_loss = F.kl_div(class_prob, class_true, reduction="batchmean")
 
     # --- orthogonality ---
     ortho = orthogonal_loss(z_age, z_noise)

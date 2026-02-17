@@ -16,6 +16,12 @@ class Stage1Result:
     last_log: Dict[str, float]
 
 
+def age_to_group(age):
+    start_age_year = 35
+    group_interval_year = 10
+
+    group = ((age - start_age_year) // group_interval_year).clamp(0, 6)
+    return group.long()
 @torch.no_grad()
 def _eval_stage1(model, loader, loss_fn, device, cfg) -> Tuple[float, Dict[str, float]]:
     model.eval()
@@ -24,8 +30,6 @@ def _eval_stage1(model, loader, loss_fn, device, cfg) -> Tuple[float, Dict[str, 
     log_sum = {}
 
     for batch in loader:
-        # expected: (x, ... mask) 你根据自己的 dataset 输出对齐
-        # 常见：x, label, mask  或 x, ec, label, fc_mask, ec_mask
         if len(batch) == 3:
             x, age_true, mask = batch
             class_true = None
@@ -33,7 +37,6 @@ def _eval_stage1(model, loader, loss_fn, device, cfg) -> Tuple[float, Dict[str, 
             x, _, age_true, mask, _ = batch
             class_true = None
         else:
-            # 兜底：至少要 x 和 age_true
             x = batch[0]
             age_true = batch[1]
             mask = batch[-1]
@@ -44,10 +47,8 @@ def _eval_stage1(model, loader, loss_fn, device, cfg) -> Tuple[float, Dict[str, 
 
         recon, z_age, z_noise, mu, logits = model(x)
 
-        # 如果你有 age_group 分类监督，这里可自己接上 class_true
-        # 否则传 dummy（loss_fn 里别用就行）
         if class_true is None:
-            class_true = torch.zeros(x.size(0), dtype=torch.long, device=device)
+            class_true = age_to_group(age_true)
 
         loss, log = loss_fn(
             recon=recon, x=x, mu=mu, age_true=age_true,
@@ -126,7 +127,7 @@ def train_stage1(
             recon, z_age, z_noise, mu, logits = model(x)
 
             if class_true is None:
-                class_true = torch.zeros(x.size(0), dtype=torch.long, device=device)
+                class_true = age_to_group(age_true)
 
             loss, log = loss_fn(
                 recon=recon, x=x, mu=mu, age_true=age_true,
