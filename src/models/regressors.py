@@ -87,7 +87,7 @@ class ConvAgeRegressorConfig:
     kernel_sizes: Tuple[int, ...] = (3, 5)
     dropout: float = 0.1
     gate_softmax_dim: int = 2  # softmax over channel dim by default
-    residual_scale: float = 0.0
+    residual_scale: float = 0.1
     bias_shift_init: float = 1.0
     tau: float = 2.5
 

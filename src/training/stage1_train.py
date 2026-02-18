@@ -137,9 +137,9 @@ def train_stage1(
                 epoch=epoch, max_epoch=cfg.epochs_stage1
             )
 
-            optimizer.zero_grad(set_to_none=True)
+            optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
             optimizer.step()
 
             bs = x.size(0)
