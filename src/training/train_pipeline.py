@@ -43,8 +43,8 @@ class TrainConfig:
     pct_start: float =0.15
     anneal_strategy: str="cos"
     div_factor: float = 10.0
-    final_div_factor: float = 100.0
-    tau_regressor: float = 2.0
+    final_div_factor: float = 500.0
+    tau_regressor: float = 2.5
     hidden_channel: int = 1
     gate_softmax_dim: int = 2
 
@@ -172,11 +172,15 @@ def train_and_eval(
         #
         save_dir = f'../result/fold{i + 1}'
         os.makedirs(save_dir, exist_ok=True)
-        save_path = os.path.join(save_dir, "stage2_train_predictions.xlsx")
 
-        df = pd.DataFrame(s2.train_rows)
+        #
+        df = pd.read_excel(s1.test_rows)
+        save_path = os.path.join(save_dir, "stage1_test_predictions.xlsx")
         df.to_excel(save_path, index=False)
-
+        #
+        df = pd.DataFrame(s2.train_rows)
+        save_path = os.path.join(save_dir, "stage2_train_predictions.xlsx")
+        df.to_excel(save_path, index=False)
         #
         fold_mae.append(s2.best_val_mae)
         df = pd.DataFrame(s2.test_rows)
