@@ -23,7 +23,7 @@ from src.training.losses import orthogonal_guided_loss
 class TrainConfig:
     seed: int = 1000
     device: str = "cuda"  # or "cpu"
-    num_workers: int = 0
+    num_workers: int = os.cpu_count()-1
     batch_num: int = 2
 
     # stage1
@@ -44,7 +44,7 @@ class TrainConfig:
     anneal_strategy: str="cos"
     div_factor: float = 10.0
     final_div_factor: float = 500.0
-    tau_regressor: float = 2.5
+    tau_regressor: float = 3
     hidden_channel: int = 1
     gate_softmax_dim: int = 2
 
@@ -52,7 +52,7 @@ class TrainConfig:
     w_recon: float = 0.1
     w_age: float = 0.4
     w_ortho: float = 0.2
-    w_class: float = 0.75
+    w_class: float = 0.1
 
     grad_clip: float = 5.0
     verbose: bool = True
@@ -79,15 +79,15 @@ def _resolve_device(cfg: TrainConfig) -> torch.device:
 def _build_loaders(train_ds, val_ds, test_ds, cfg: TrainConfig) -> Tuple[DataLoader, DataLoader, DataLoader]:
     train_loader = DataLoader(
         train_ds, batch_size=int(len(train_ds)/TrainConfig.batch_num), shuffle=True,
-        num_workers=cfg.num_workers, pin_memory=False, drop_last=True
+        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=True, drop_last=True
     )
     val_loader = DataLoader(
         val_ds, batch_size=int(len(val_ds)), shuffle=False,
-        num_workers=cfg.num_workers, pin_memory=False
+        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=True
     )
     test_loader = DataLoader(
         test_ds, batch_size=int(len(test_ds)), shuffle=False,
-        num_workers=cfg.num_workers, pin_memory=False
+        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=True
     )
     return train_loader, val_loader, test_loader
 
@@ -174,7 +174,7 @@ def train_and_eval(
         os.makedirs(save_dir, exist_ok=True)
 
         #
-        df = pd.read_excel(s1.test_rows)
+        df = pd.DataFrame(s1.test_rows)
         save_path = os.path.join(save_dir, "stage1_test_predictions.xlsx")
         df.to_excel(save_path, index=False)
         #
