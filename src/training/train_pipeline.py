@@ -13,7 +13,7 @@ from src.training.stage2_train import train_stage2
 from src.training.metrics import compute_metrics
 from src.training.io_training import save_json, try_export_csv
 
-# 你的模型 / loss（按你现有文件名改一下 import 即可）
+# src import
 from src.models.OAG_CAE import OrthogonalAutoEncoder,OAEConfig
 from src.models.regressors import ConvAgeRegressor, ConvAgeRegressorConfig
 from src.training.losses import orthogonal_guided_loss
@@ -27,11 +27,11 @@ class TrainConfig:
     batch_num: int = 2
 
     # stage1
-    epochs_stage1: int = 1000
-    lr_stage1: float = 3e-4
+    epochs_stage1: int = 2000
+    lr_stage1: float = 2e-4
     wd_stage1: float = 2e-3
     warmup: int = 500
-    tau_aux: float = 1.4
+    tau_aux: float = 1.5
 
 
 
@@ -40,17 +40,17 @@ class TrainConfig:
     lr_stage2: float = 2e-2
     wd_stage2: float = 2e-3
     early_stop_patience: int = 10
-    pct_start: float =0.15
-    anneal_strategy: str="cos"
+    pct_start: float = 0.15
+    anneal_strategy: str = "cos"
     div_factor: float = 10.0
-    final_div_factor: float = 500.0
-    tau_regressor: float = 3
+    final_div_factor: float = 1000.0
+    tau_regressor: float = 1.5
     hidden_channel: int = 1
     gate_softmax_dim: int = 2
 
     # loss weights
     w_recon: float = 0.1
-    w_age: float = 0.4
+    w_age: float = 0.3
     w_ortho: float = 0.2
     w_class: float = 0.1
 
@@ -121,8 +121,10 @@ def train_and_eval(
 
     for i, (train_x, train_y, val_x, val_y, test_x, test_y) in enumerate(folds):
         print(f"\n===== Fold {i+1}/{len(folds)} =====")
-
-        # 只用 train 拟合 normalize，再 apply 到 val
+        # debug on fold=2
+        #if i!=2:
+        #    continue
+        # normalize based on the mean and std of train set
         mean, std = z_score_normalize_fit(train_x)
         train_x_n = z_score_normalize_apply(train_x, mean, std)
         val_x_n = z_score_normalize_apply(val_x, mean, std)
@@ -188,7 +190,7 @@ def train_and_eval(
         df.to_excel(save_path, index=False)
         #
 
-        # 输出 fold 结果
+        # printf the result on screen
         save_json(f"{cfg.out_dir}/fold{i+1}_summary.json", {
             "fold": i + 1,
             "stage1_best_val_loss": s1.best_val_loss,

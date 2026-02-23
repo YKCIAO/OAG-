@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from sklearn.decomposition import PCA
 
-from src.models.OAG_CAE import OrthogonalAutoEncoder
+from src.models.OAG_CAE import OrthogonalAutoEncoder,OAEConfig
 from src.models.regressors import ConvAgeRegressor, ConvAgeRegressorConfig
 from src.explain.model_adapters import PCA2AgeWrapper
 from src.explain.pca_shap import KernelShapConfig, run_kernelshap_on_pca, backproject_shap_to_fc
@@ -65,10 +65,12 @@ def main():
         x_pca = x_pca_all[start:end]
 
         # load fold models
-        encoder = OrthogonalAutoEncoder(input_dim=278, z_age_dim=32, z_noise_dim=32)
+        OAG_cfg = OAEConfig(input_size=278, z_age_dim=32, z_noise_dim=32,
+                            tau=1.5)
+        encoder = OrthogonalAutoEncoder(cfg=OAG_cfg)
         encoder.load_state_dict(torch.load(args.encoder_template.format(fold=fold), map_location="cpu"))
         encoder.eval()
-        reg_cfg = ConvAgeRegressorConfig(in_dim=32, hidden_channels=1, length=32, tau=2.5,
+        reg_cfg = ConvAgeRegressorConfig(in_dim=32, hidden_channels=1, length=32, tau=1.5,
                                          gate_softmax_dim=2)
         regressor = ConvAgeRegressor(reg_cfg)
         regressor.load_state_dict(torch.load(args.regressor_template.format(fold=fold), map_location="cpu"))

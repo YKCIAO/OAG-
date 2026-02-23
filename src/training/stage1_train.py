@@ -231,8 +231,7 @@ def train_stage1(
     if cfg.verbose:
         print(f"[Stage1][TEST] loss={test_loss:.4f} log={test_log}")
 
-    # 如果你的 Stage1Result 结构体目前没有 test 字段：
-    # 你可以先只返回 best_sd/best_val/last_log；或者扩展 Stage1Result（推荐扩展）
+    #  Stage1Result is a struct constructed on the above
     return Stage1Result(
         best_state_dict=best_sd,
         best_val_loss=float(best_val),

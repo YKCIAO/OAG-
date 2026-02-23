@@ -21,7 +21,7 @@ class OAEConfig:
     conv_stride: int = 3
     dropout: float = 0.15
     n_age_groups: int = 7
-    age_noise_sigma: float = 0.02    # noise added to z_age before reg/class
+    age_noise_sigma: float = 0.03    # noise added to z_age before reg/class
     tau: float = 1.5
 
 
@@ -47,7 +47,7 @@ class OrthogonalAutoEncoder(nn.Module):
 
         self.z_age_dim = self.cfg.z_age_dim
         self.z_noise_dim = self.cfg.z_noise_dim
-        self.latent_dim = self.z_age_dim + self.z_noise_dim
+        self.latent_dim = self.cfg.z_age_dim + self.cfg.z_noise_dim
 
         # Encoder conv: (1,278,278) -> (32,29,29) with your kernel/stride
         self.encoder = nn.Sequential(

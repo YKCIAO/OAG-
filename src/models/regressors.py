@@ -24,9 +24,9 @@ class TemperatureSoftmax(nn.Module):
 @dataclass
 class AttentionRegressorConfig:
     in_dim: int
-    tau: float = 1.4
+    tau: float = 1.5
     scale_by_dim: bool = True
-    dropout: float = 0.0
+    dropout: float = 0.15
 
 
 class AttentionRegressor(nn.Module):
@@ -87,7 +87,7 @@ class ConvAgeRegressorConfig:
     kernel_sizes: Tuple[int, ...] = (3, 5)
     dropout: float = 0.1
     gate_softmax_dim: int = 2  # softmax over channel dim by default
-    residual_scale: float = 0.1
+    residual_scale: float = 0.0
     bias_shift_init: float = 1.0
     tau: float = 2.5
 
@@ -127,6 +127,7 @@ class ConvAgeRegressor(nn.Module):
             blocks.append(
                 nn.Sequential(
                     nn.Conv1d(cfg.hidden_channels, cfg.hidden_channels, kernel_size=1, padding=0),
+                    #nn.Dropout(cfg.dropout),
                     nn.GELU(),
                     nn.Conv1d(cfg.hidden_channels, cfg.hidden_channels, kernel_size=k, padding=k // 2, bias=True),
                     nn.GELU(),
@@ -159,6 +160,6 @@ class ConvAgeRegressor(nn.Module):
 
         pred = self.reg_head(fused).squeeze(1) # (B,)
 
-        return pred
+        return pred + self.bias_shift
 
 # src/models/regressors.py

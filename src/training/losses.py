@@ -99,15 +99,20 @@ def orthogonal_guided_loss(
     # Make shapes robust for huber
     age_true_f = age_true.float().view(-1)
     mu_f = mu.float().view(-1)
-    age_loss = F.huber_loss(mu_f, age_true_f)
+    age_loss = F.l1_loss(mu_f, age_true_f)
 
     # --- classification loss (standard) ---
     # class_true expected as integer class index tensor shape (B,)
     #class_true = class_true.long().view(-1)
     #class_loss = F.cross_entropy(class_pred_logits, class_true)
     # --- classification loss (KL) ---
+
+    class_prob = F.log_softmax(class_pred_logits, dim=1)
+    class_true = F.one_hot(class_true, num_classes=7).float()
+    class_loss = F.kl_div(class_prob, F.softmax(class_true, dim=1), reduction="batchmean")
+    '''
     K = 7
-    sigma = 1.2 # Smaller means lower smoothing level, keep it higher than 0.6
+    sigma = 0.6 # Smaller means lower smoothing level, keep it higher than 0.6
     idx = torch.arange(K, device=class_true.device).float()
 
     target = torch.exp(-(idx[None, :] - class_true[:, None].float()) ** 2 / (2 * sigma ** 2))
@@ -115,7 +120,7 @@ def orthogonal_guided_loss(
 
     logp = F.log_softmax(class_pred_logits, dim=1)
     class_loss = F.kl_div(logp, target, reduction="batchmean")
-
+    '''
     # --- orthogonality ---
     ortho = orthogonal_loss(z_age, z_noise)
 
